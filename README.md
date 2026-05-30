@@ -31,20 +31,36 @@ device, not just one laptop.
 
 ## Install
 
+The quickest path — builds, installs the binary, writes a udev rule matched to
+your device, and adds you to the `input` group:
+
+```sh
+git clone https://github.com/mrp2003/lampctl
+cd lampctl
+./install.sh           # uses sudo for the binary + udev rule
+```
+
+Log out and back in (so the `input` group takes effect), then run `lampctl`.
+
+Prefer to do it by hand?
+
 ```sh
 cargo install --path crates/lampctl
 ```
 
-You'll need read/write access to the device's `hidraw` node. Add yourself to the
-`input` group (and re-login), or install the provided udev rule.
+Then give your session read/write access to the device's `hidraw` node: copy
+[`dist/99-lampctl.rules`](dist/99-lampctl.rules) into `/etc/udev/rules.d/`
+(adjust the VID:PID to match `lampctl list`), `sudo udevadm control --reload-rules`,
+and add yourself to the `input` group.
 
 ## Usage
 
 ```sh
 lampctl              # launch the TUI
+lampctl --demo       # launch the TUI with no device (preview mode)
 lampctl set 00e5ff   # solid cyan
 lampctl off          # lights out
-lampctl list         # show detected LampArray devices
+lampctl list         # show detected LampArray devices (with VID:PID)
 ```
 
 ## How it works

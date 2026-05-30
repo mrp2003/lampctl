@@ -75,6 +75,10 @@ pub struct DeviceInfo {
     pub node: PathBuf,
     /// Human-readable HID name, if the kernel exposes one.
     pub name: String,
+    /// USB/HID vendor id.
+    pub vendor_id: u16,
+    /// USB/HID product id.
+    pub product_id: u16,
 }
 
 /// Find every `hidraw` device that advertises the LampArray usage page.
@@ -90,19 +94,33 @@ pub fn discover() -> io::Result<Vec<DeviceInfo>> {
         if !contains(&desc, &USAGE_PAGE_LIGHTING) {
             continue;
         }
-        let name = fs::read_to_string(dev_dir.join("uevent"))
-            .ok()
-            .and_then(|u| {
-                u.lines()
-                    .find_map(|l| l.strip_prefix("HID_NAME=").map(str::to_owned))
-            })
+        let uevent = fs::read_to_string(dev_dir.join("uevent")).unwrap_or_default();
+        let name = uevent
+            .lines()
+            .find_map(|l| l.strip_prefix("HID_NAME=").map(str::to_owned))
             .unwrap_or_else(|| "LampArray device".to_string());
+        let (vendor_id, product_id) = uevent
+            .lines()
+            .find_map(|l| l.strip_prefix("HID_ID="))
+            .and_then(parse_hid_id)
+            .unwrap_or((0, 0));
         out.push(DeviceInfo {
             node: PathBuf::from("/dev").join(entry.file_name()),
             name,
+            vendor_id,
+            product_id,
         });
     }
     Ok(out)
+}
+
+/// Parse a `HID_ID=bus:vendor:product` string (e.g. `0018:00000B05:000019B6`).
+fn parse_hid_id(s: &str) -> Option<(u16, u16)> {
+    let mut parts = s.trim().split(':');
+    let _bus = parts.next()?;
+    let vendor = u32::from_str_radix(parts.next()?.trim(), 16).ok()? as u16;
+    let product = u32::from_str_radix(parts.next()?.trim(), 16).ok()? as u16;
+    Some((vendor, product))
 }
 
 /// An open handle to a LampArray device.
@@ -205,5 +223,14 @@ mod tests {
     fn subslice_search() {
         assert!(contains(&[1, 2, 0x05, 0x59, 9], &USAGE_PAGE_LIGHTING));
         assert!(!contains(&[1, 2, 3], &USAGE_PAGE_LIGHTING));
+    }
+
+    #[test]
+    fn hid_id_parsing() {
+        assert_eq!(
+            parse_hid_id("0018:00000B05:000019B6"),
+            Some((0x0B05, 0x19B6))
+        );
+        assert_eq!(parse_hid_id("garbage"), None);
     }
 }

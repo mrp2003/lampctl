@@ -1,0 +1,10 @@
+# lampctl — grant the local login session access to HID LampArray devices.
+#
+# This is an EXAMPLE/template. `./install.sh` writes a copy matched to the
+# exact VID:PID of the LampArray device(s) found on your machine.
+#
+# Match is against the kernel HID device name, e.g. "0018:0B05:19B6.0002",
+# so use UPPERCASE hex for the VID:PID.
+#
+# ASUS (TUF/ROG) ITE LampArray controller — e.g. TUF Gaming A16 FA608UP:
+KERNEL=="hidraw*", KERNELS=="*0B05:19B6*", MODE="0660", GROUP="input", TAG+="uaccess"

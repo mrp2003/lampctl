@@ -47,7 +47,13 @@ fn main() -> anyhow::Result<()> {
                 println!("no HID LampArray devices found");
             }
             for d in devices {
-                println!("{:<14} {}", d.node.display(), d.name);
+                println!(
+                    "{:<14} {:04x}:{:04x}  {}",
+                    d.node.display(),
+                    d.vendor_id,
+                    d.product_id,
+                    d.name
+                );
             }
         }
         None => app::run(cli.demo)?,
