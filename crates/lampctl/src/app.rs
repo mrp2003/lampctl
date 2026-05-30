@@ -160,15 +160,18 @@ impl App {
 
     fn draw_logo(&self, f: &mut Frame, area: Rect) {
         let lines = vec![
-            Line::from(r"  ┃  ┏━┓ ┏┳┓ ┏━┓ ┏━╸ ╺┳╸ ╻  ").fg(ACCENT).bold(),
-            Line::from(r"  ┃  ┣━┫ ┃┃┃ ┣━┛ ┃    ┃  ┃  ").fg(ACCENT).bold(),
-            Line::from(r"  ┗━╸╹ ╹ ╹ ╹ ╹   ┗━╸  ╹  ┗━╸").fg(ACCENT).bold(),
+            Line::from(r"  ┃  ┏━┓ ┏┳┓ ┏━┓ ┏━╸ ╺┳╸ ╻  ")
+                .fg(ACCENT)
+                .bold(),
+            Line::from(r"  ┃  ┣━┫ ┃┃┃ ┣━┛ ┃    ┃  ┃  ")
+                .fg(ACCENT)
+                .bold(),
+            Line::from(r"  ┗━╸╹ ╹ ╹ ╹ ╹   ┗━╸  ╹  ┗━╸")
+                .fg(ACCENT)
+                .bold(),
             Line::from("keyboard light control").fg(DIM).italic(),
         ];
-        f.render_widget(
-            Paragraph::new(lines).alignment(Alignment::Center),
-            area,
-        );
+        f.render_widget(Paragraph::new(lines).alignment(Alignment::Center), area);
     }
 
     fn draw_modes(&self, f: &mut Frame, area: Rect) {
@@ -228,7 +231,10 @@ impl App {
     fn draw_footer(&self, f: &mut Frame, area: Rect) {
         let hint = |k: &'static str, d: &'static str| {
             vec![
-                Span::styled(format!(" {k} "), Style::default().fg(Color::Black).bg(ACCENT)),
+                Span::styled(
+                    format!(" {k} "),
+                    Style::default().fg(Color::Black).bg(ACCENT),
+                ),
                 Span::styled(format!(" {d}   "), Style::default().fg(DIM)),
             ]
         };
@@ -266,7 +272,10 @@ fn titled(title: &str) -> Block<'_> {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(DIM))
-        .title(Span::styled(format!(" {title} "), Style::default().fg(ACCENT).bold()))
+        .title(Span::styled(
+            format!(" {title} "),
+            Style::default().fg(ACCENT).bold(),
+        ))
 }
 
 /// Centre a `width` x `height` region inside `area`, both horizontally and vertically.

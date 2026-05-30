@@ -6,7 +6,11 @@ mod app;
 mod color;
 
 #[derive(Parser)]
-#[command(name = "lampctl", version, about = "Control HID LampArray keyboard lighting (TUI + CLI)")]
+#[command(
+    name = "lampctl",
+    version,
+    about = "Control HID LampArray keyboard lighting (TUI + CLI)"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Option<Cmd>,
@@ -29,8 +33,8 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Some(Cmd::Set { hex }) => {
-            let c =
-                Rgb::from_hex(&hex).ok_or_else(|| anyhow::anyhow!("invalid colour '{hex}' (want RRGGBB)"))?;
+            let c = Rgb::from_hex(&hex)
+                .ok_or_else(|| anyhow::anyhow!("invalid colour '{hex}' (want RRGGBB)"))?;
             open()?.set_all(c)?;
         }
         Some(Cmd::Off) => open()?.set_all(Rgb::BLACK)?,
