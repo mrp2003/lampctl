@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/lamparray", "crates/lampctl"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mrp2003/lampctl"
+authors = ["mrp2003"]
+rust-version = "1.74"
+
+[workspace.dependencies]
+lamparray = { path = "crates/lamparray", version = "0.1.0" }
+
+[profile.release]
+strip = true
+lto = "thin"

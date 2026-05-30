@@ -1,0 +1,15 @@
+[package]
+name = "lamparray"
+description = "A tiny, dependency-light Rust library for HID LampArray lighting devices (the open Microsoft Dynamic Lighting standard)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+keywords = ["hid", "lamparray", "rgb", "lighting", "keyboard"]
+categories = ["hardware-support", "api-bindings"]
+readme = "../../README.md"
+
+[dependencies]
+libc = "0.2"
