@@ -61,10 +61,11 @@ struct App {
     focus: Focus,
     phase: f64, // animation phase
     quit: bool,
+    preview: bool, // true when no real device is attached
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(preview: bool) -> Self {
         App {
             selected: 0,
             hue: 188.0,
@@ -73,6 +74,7 @@ impl App {
             focus: Focus::Hue,
             phase: 0.0,
             quit: false,
+            preview,
         }
     }
 
@@ -95,11 +97,17 @@ impl App {
         }
     }
 
-    fn apply(&self, lamp: &mut LampArray) {
-        let _ = lamp.set_all(self.color());
+    fn apply(&self, lamp: &mut Option<LampArray>) {
+        if let Some(l) = lamp.as_mut() {
+            let _ = l.set_all(self.color());
+        }
     }
 
-    fn run(mut self, terminal: &mut DefaultTerminal, lamp: &mut LampArray) -> anyhow::Result<()> {
+    fn run(
+        mut self,
+        terminal: &mut DefaultTerminal,
+        lamp: &mut Option<LampArray>,
+    ) -> anyhow::Result<()> {
         self.apply(lamp);
         while !self.quit {
             terminal.draw(|f| self.draw(f))?;
@@ -118,7 +126,7 @@ impl App {
         Ok(())
     }
 
-    fn on_key(&mut self, code: KeyCode, lamp: &mut LampArray) {
+    fn on_key(&mut self, code: KeyCode, lamp: &mut Option<LampArray>) {
         match code {
             KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
             KeyCode::Up => self.selected = self.selected.saturating_sub(1),
@@ -169,7 +177,13 @@ impl App {
             Line::from(r"  ┗━╸╹ ╹ ╹ ╹ ╹   ┗━╸  ╹  ┗━╸")
                 .fg(ACCENT)
                 .bold(),
-            Line::from("keyboard light control").fg(DIM).italic(),
+            Line::from(if self.preview {
+                "keyboard light control · preview (no device)"
+            } else {
+                "keyboard light control"
+            })
+            .fg(DIM)
+            .italic(),
         ];
         f.render_widget(Paragraph::new(lines).alignment(Alignment::Center), area);
     }
@@ -295,15 +309,21 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
     mid
 }
 
-pub fn run() -> anyhow::Result<()> {
-    let mut lamp = LampArray::open_first().map_err(|e| {
-        anyhow::anyhow!(
-            "could not open a LampArray device: {e}\n\
-             hint: add your user to the 'input' group and re-login."
-        )
-    })?;
+pub fn run(demo: bool) -> anyhow::Result<()> {
+    let mut lamp = if demo {
+        None
+    } else {
+        match LampArray::open_first() {
+            Ok(l) => Some(l),
+            Err(e) => {
+                eprintln!("note: no LampArray device ({e}); starting in preview mode.");
+                None
+            }
+        }
+    };
+    let preview = lamp.is_none();
     let mut terminal = ratatui::init();
-    let result = App::new().run(&mut terminal, &mut lamp);
+    let result = App::new(preview).run(&mut terminal, &mut lamp);
     ratatui::restore();
     result
 }

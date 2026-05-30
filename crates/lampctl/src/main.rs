@@ -12,6 +12,9 @@ mod color;
     about = "Control HID LampArray keyboard lighting (TUI + CLI)"
 )]
 struct Cli {
+    /// Launch the TUI without a device (preview mode, for demos/screenshots).
+    #[arg(long)]
+    demo: bool,
     #[command(subcommand)]
     cmd: Option<Cmd>,
 }
@@ -47,7 +50,7 @@ fn main() -> anyhow::Result<()> {
                 println!("{:<14} {}", d.node.display(), d.name);
             }
         }
-        None => app::run()?,
+        None => app::run(cli.demo)?,
     }
     Ok(())
 }
