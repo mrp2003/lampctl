@@ -6,13 +6,13 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Gauge, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::color::hsv_to_rgb;
 
-const ACCENT: Color = Color::Rgb(0x3A, 0xC5, 0xD6); // the sai-ish cyan
-const DIM: Color = Color::Rgb(0x6A, 0x7A, 0x7E);
+const ACCENT: Color = Color::Rgb(0xF5, 0xF5, 0xF5); // bright white accent
+const DIM: Color = Color::Rgb(0xA6, 0xAE, 0xB0); // brighter, more legible gray
 const TICK: Duration = Duration::from_millis(40);
 
 #[derive(Clone, Copy, PartialEq)]
@@ -49,12 +49,14 @@ impl Mode {
 #[derive(Clone, Copy, PartialEq)]
 enum Focus {
     Hue,
+    Sat,
     Bri,
 }
 
 struct App {
     selected: usize,
     hue: f64, // 0..360
+    sat: u8,  // 0..100 (%)
     bri: u8,  // 0..100 (%)
     focus: Focus,
     phase: f64, // animation phase
@@ -66,6 +68,7 @@ impl App {
         App {
             selected: 0,
             hue: 188.0,
+            sat: 100,
             bri: 85,
             focus: Focus::Hue,
             phase: 0.0,
@@ -80,13 +83,14 @@ impl App {
     /// Colour to display/apply *right now*, accounting for animation.
     fn color(&self) -> Rgb {
         let v = self.bri as f64 / 100.0;
+        let s = self.sat as f64 / 100.0;
         match self.mode() {
             Mode::Off => Rgb::BLACK,
-            Mode::Static => hsv_to_rgb(self.hue, 1.0, v),
+            Mode::Static => hsv_to_rgb(self.hue, s, v),
             Mode::Rainbow => hsv_to_rgb(self.phase * 90.0 % 360.0, 1.0, v),
             Mode::Breathe => {
                 let m = (self.phase.sin() * 0.5 + 0.5) * v;
-                hsv_to_rgb(self.hue, 1.0, m)
+                hsv_to_rgb(self.hue, s, m)
             }
         }
     }
@@ -119,16 +123,19 @@ impl App {
             KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
             KeyCode::Up => self.selected = self.selected.saturating_sub(1),
             KeyCode::Down => self.selected = (self.selected + 1).min(Mode::ALL.len() - 1),
-            KeyCode::Tab => {
-                self.focus = if self.focus == Focus::Hue { Focus::Bri } else { Focus::Hue }
+            KeyCode::Char(' ') | KeyCode::Tab => {
+                self.focus = match self.focus {
+                    Focus::Hue => Focus::Sat,
+                    Focus::Sat => Focus::Bri,
+                    Focus::Bri => Focus::Hue,
+                }
             }
             KeyCode::Left | KeyCode::Right => {
-                let step = if code == KeyCode::Right { 1.0 } else { -1.0 };
+                let step: i32 = if code == KeyCode::Right { 1 } else { -1 };
                 match self.focus {
-                    Focus::Hue => self.hue = (self.hue + step * 8.0).rem_euclid(360.0),
-                    Focus::Bri => {
-                        self.bri = (self.bri as i32 + (step * 5.0) as i32).clamp(0, 100) as u8
-                    }
+                    Focus::Hue => self.hue = (self.hue + step as f64 * 8.0).rem_euclid(360.0),
+                    Focus::Sat => self.sat = (self.sat as i32 + step * 5).clamp(0, 100) as u8,
+                    Focus::Bri => self.bri = (self.bri as i32 + step * 5).clamp(0, 100) as u8,
                 }
             }
             _ => {}
@@ -140,10 +147,10 @@ impl App {
         let [logo, modes, adjust, footer] = Layout::vertical([
             Constraint::Length(6),
             Constraint::Length(6),
-            Constraint::Length(4),
+            Constraint::Length(5),
             Constraint::Length(1),
         ])
-        .areas(centered(f.area(), 64));
+        .areas(centered(f.area(), 64, 18));
 
         self.draw_logo(f, logo);
         self.draw_modes(f, modes);
@@ -168,16 +175,9 @@ impl App {
         let items: Vec<ListItem> = Mode::ALL
             .iter()
             .map(|m| {
-                let swatch = if *m == Mode::Static {
-                    let c = self.color();
-                    Span::styled("  ███ ", Style::default().fg(Color::Rgb(c.r, c.g, c.b)))
-                } else {
-                    Span::raw("      ")
-                };
                 ListItem::new(Line::from(vec![
                     Span::styled(format!("{:<10}", m.label()), Style::default().bold()),
-                    Span::styled(format!("{:<22}", m.desc()), Style::default().fg(DIM)),
-                    swatch,
+                    Span::styled(m.desc(), Style::default().fg(DIM)),
                 ]))
             })
             .collect();
@@ -197,27 +197,32 @@ impl App {
         let inner = block.inner(area);
         f.render_widget(block, area);
 
-        let [hue_row, bri_row] =
-            Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(inner);
-
-        let hue_focus = self.focus == Focus::Hue;
-        let bri_focus = self.focus == Focus::Bri;
-
         let c = self.color();
-        f.render_widget(
-            gauge("Hue", self.hue / 360.0, format!("{:>3}°", self.hue as u16), hue_focus)
-                .gauge_style(Style::default().fg(Color::Rgb(c.r, c.g, c.b))),
-            hue_row,
-        );
-        f.render_widget(
-            gauge(
-                "Bri",
+        let cur = Color::Rgb(c.r, c.g, c.b);
+        let rows = vec![
+            slider(
+                "Hue",
+                self.hue / 360.0,
+                format!("{:>3}°", self.hue as u16),
+                self.focus == Focus::Hue,
+                cur,
+            ),
+            slider(
+                "Saturation",
+                self.sat as f64 / 100.0,
+                format!("{:>3}%", self.sat),
+                self.focus == Focus::Sat,
+                ACCENT,
+            ),
+            slider(
+                "Brightness",
                 self.bri as f64 / 100.0,
                 format!("{:>3}%", self.bri),
-                bri_focus,
+                self.focus == Focus::Bri,
+                ACCENT,
             ),
-            bri_row,
-        );
+        ];
+        f.render_widget(Paragraph::new(rows), inner);
     }
 
     fn draw_footer(&self, f: &mut Frame, area: Rect) {
@@ -230,7 +235,7 @@ impl App {
         let mut spans = Vec::new();
         spans.extend(hint("↑↓", "mode"));
         spans.extend(hint("←→", "adjust"));
-        spans.extend(hint("⇥", "hue/bri"));
+        spans.extend(hint("space", "h/s/b"));
         spans.extend(hint("q", "quit"));
         f.render_widget(
             Paragraph::new(Line::from(spans)).alignment(Alignment::Center),
@@ -239,17 +244,21 @@ impl App {
     }
 }
 
-fn gauge<'a>(name: &'a str, ratio: f64, label: String, focus: bool) -> Gauge<'a> {
+/// Render one labelled slider row: `Name  ██████░░░░  value`.
+fn slider(name: &str, ratio: f64, value: String, focus: bool, fill: Color) -> Line<'static> {
+    const W: usize = 24;
+    let filled = (ratio.clamp(0.0, 1.0) * W as f64).round() as usize;
     let name_style = if focus {
         Style::default().fg(ACCENT).bold()
     } else {
         Style::default().fg(DIM)
     };
-    Gauge::default()
-        .block(Block::default().title(Span::styled(format!(" {name} "), name_style)))
-        .ratio(ratio.clamp(0.0, 1.0))
-        .label(label)
-        .use_unicode(true)
+    Line::from(vec![
+        Span::styled(format!(" {name:<12}"), name_style),
+        Span::styled("█".repeat(filled), Style::default().fg(fill)),
+        Span::styled("░".repeat(W - filled), Style::default().fg(DIM)),
+        Span::styled(format!("  {value}"), Style::default().fg(DIM)),
+    ])
 }
 
 fn titled(title: &str) -> Block<'_> {
@@ -260,14 +269,20 @@ fn titled(title: &str) -> Block<'_> {
         .title(Span::styled(format!(" {title} "), Style::default().fg(ACCENT).bold()))
 }
 
-/// Horizontally centre a `width`-column column inside `area`.
-fn centered(area: Rect, width: u16) -> Rect {
+/// Centre a `width` x `height` region inside `area`, both horizontally and vertically.
+fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let [_, row, _] = Layout::vertical([
+        Constraint::Fill(1),
+        Constraint::Length(height.min(area.height)),
+        Constraint::Fill(1),
+    ])
+    .areas(area);
     let [_, mid, _] = Layout::horizontal([
         Constraint::Fill(1),
         Constraint::Length(width.min(area.width)),
         Constraint::Fill(1),
     ])
-    .areas(area);
+    .areas(row);
     mid
 }
 
