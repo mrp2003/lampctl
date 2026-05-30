@@ -321,7 +321,7 @@ pub fn run(demo: bool) -> anyhow::Result<()> {
             }
         }
     };
-    let preview = lamp.is_none();
+    let preview = !demo && lamp.is_none();
     let mut terminal = ratatui::init();
     let result = App::new(preview).run(&mut terminal, &mut lamp);
     ratatui::restore();
