@@ -5,6 +5,8 @@
 **A fast TUI + CLI to control keyboard lighting over the open HID LampArray standard.**
 
 [![CI](https://github.com/mrp2003/lampctl/actions/workflows/ci.yml/badge.svg)](https://github.com/mrp2003/lampctl/actions)
+[![lampctl on crates.io](https://img.shields.io/crates/v/lampctl.svg?label=lampctl)](https://crates.io/crates/lampctl)
+[![lamparray on crates.io](https://img.shields.io/crates/v/lamparray.svg?label=lamparray)](https://crates.io/crates/lamparray)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 ![lampctl demo](docs/demo.gif)
@@ -33,27 +35,33 @@ device, not just one laptop.
 
 ## Install
 
-The quickest path — builds, installs the binary, writes a udev rule matched to
-your device, and adds you to the `input` group:
-
 ```sh
-git clone https://github.com/mrp2003/lampctl
-cd lampctl
-./install.sh           # uses sudo for the binary + udev rule
+cargo install lampctl
 ```
 
-Log out and back in (so the `input` group takes effect), then run `lampctl`.
-
-Prefer to do it by hand?
+`lampctl` needs read/write access to the device's `hidraw` node. The repo's setup
+script writes a udev rule matched to your device and adds you to the `input` group:
 
 ```sh
-cargo install --path crates/lampctl
+git clone https://github.com/mrp2003/lampctl && cd lampctl
+./install.sh        # detects your device; uses sudo for the udev rule
 ```
 
-Then give your session read/write access to the device's `hidraw` node: copy
-[`dist/99-lampctl.rules`](dist/99-lampctl.rules) into `/etc/udev/rules.d/`
-(adjust the VID:PID to match `lampctl list`), `sudo udevadm control --reload-rules`,
-and add yourself to the `input` group.
+`install.sh` also (re)builds and installs the binary, so you can skip
+`cargo install` if you go this route. Log out and back in (so the `input` group
+takes effect), then run `lampctl`.
+
+<details>
+<summary>Set up device access by hand</summary>
+
+Copy [`dist/99-lampctl.rules`](dist/99-lampctl.rules) into `/etc/udev/rules.d/`
+(adjust the VID:PID to match `lampctl list`), then:
+
+```sh
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG input "$USER"   # log out and back in afterwards
+```
+</details>
 
 ## Usage
 
