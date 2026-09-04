@@ -1,6 +1,7 @@
-//! Minimal `hidraw` feature-report ioctls (Linux), computed without any C bindings.
 use std::io;
 use std::os::unix::io::RawFd;
+
+use crate::hid;
 
 const HIDIOC_MAGIC: u32 = b'H' as u32;
 const IOC_WRITE: u32 = 1;
@@ -19,24 +20,33 @@ fn hidioc_gfeature(len: usize) -> u32 {
     ioc(IOC_WRITE | IOC_READ, HIDIOC_MAGIC, 0x07, len as u32)
 }
 
-/// `HIDIOCSFEATURE` — send a feature report. `buf[0]` is the report id.
-pub fn set_feature(fd: RawFd, buf: &[u8]) -> io::Result<()> {
-    let req = hidioc_sfeature(buf.len()) as libc::c_ulong;
-    let ret = unsafe { libc::ioctl(fd, req, buf.as_ptr()) };
+/// `HIDIOCSFEATURE` — send a feature report. `id` is the report id.
+pub fn set_feature_typed<T: Sized>(fd: RawFd, id: u8, data: T) -> io::Result<i32> {
+    let data = hid::Report {
+        report_id: id,
+        data,
+    };
+
+    let req = hidioc_sfeature(std::mem::size_of_val(&data)) as libc::c_ulong;
+    let ret = unsafe { libc::ioctl(fd, req, &data) };
     if ret < 0 {
         Err(io::Error::last_os_error())
     } else {
-        Ok(())
+        Ok(ret)
     }
 }
 
-/// `HIDIOCGFEATURE` — read a feature report into `buf` (`buf[0]` = report id on entry).
-pub fn get_feature(fd: RawFd, buf: &mut [u8]) -> io::Result<usize> {
-    let req = hidioc_gfeature(buf.len()) as libc::c_ulong;
-    let ret = unsafe { libc::ioctl(fd, req, buf.as_mut_ptr()) };
+/// `HIDIOCGFEATURE` — read a feature report
+pub fn get_feature_typed<T: Sized + Default>(fd: RawFd, id: u8) -> io::Result<T> {
+    let mut data = hid::Report {
+        report_id: id,
+        data: T::default(),
+    };
+    let req = hidioc_gfeature(std::mem::size_of_val(&data)) as libc::c_ulong;
+    let ret = unsafe { libc::ioctl(fd, req, &mut data) };
     if ret < 0 {
         Err(io::Error::last_os_error())
     } else {
-        Ok(ret as usize)
+        Ok(data.data)
     }
 }

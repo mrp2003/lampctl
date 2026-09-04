@@ -12,4 +12,5 @@ categories = ["hardware-support", "api-bindings"]
 readme = "../../README.md"
 
 [dependencies]
+hidparser = { version = "1.0.3", features = ["std"] }
 libc = "0.2"
